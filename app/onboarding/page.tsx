@@ -2,10 +2,29 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+function addMonths(dateStr: string, months: number): string {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  d.setMonth(d.getMonth() + months);
+  return d.toISOString().split("T")[0];
+}
+
 export default function OnboardingPage() {
   const router = useRouter();
-  const [form, setForm] = useState({ optStartDate: "", optEndDate: "", employerName: "" });
+  const [form, setForm] = useState({
+    optStartDate: "",
+    optEndDate: "",
+    employerName: "",
+  });
   const [loading, setLoading] = useState(false);
+
+  function handleStartDateChange(value: string) {
+    setForm((f) => ({
+      ...f,
+      optStartDate: value,
+      optEndDate: addMonths(value, 12), // OPT = 12 months
+    }));
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -18,30 +37,57 @@ export default function OnboardingPage() {
     router.push("/dashboard");
   }
 
+  // STEM OPT = 24 months from OPT end date
+  const stemEndDate = addMonths(form.optEndDate, 24);
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background">
       <div className="w-full max-w-md space-y-6 rounded-xl border border-border bg-card p-8">
         <div>
           <h2 className="text-2xl font-semibold">Set up your OPT</h2>
-          <p className="text-sm text-muted-foreground mt-1">Enter your OPT details to get started</p>
+          <p className="text-sm text-muted-foreground mt-1">Enter your OPT start date — end dates are calculated automatically</p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
-          {[
-            { key: "optStartDate", label: "OPT Start Date", type: "date" },
-            { key: "optEndDate", label: "OPT End Date", type: "date" },
-            { key: "employerName", label: "Employer Name (optional)", type: "text" },
-          ].map(({ key, label, type }) => (
-            <div key={key}>
-              <label className="mb-1 block text-sm font-medium">{label}</label>
-              <input
-                type={type}
-                value={form[key as keyof typeof form]}
-                onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
-                required={key !== "employerName"}
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-              />
+          <div>
+            <label className="mb-1 block text-sm font-medium">OPT Start Date</label>
+            <input
+              type="date"
+              value={form.optStartDate}
+              onChange={(e) => handleStartDateChange(e.target.value)}
+              required
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium">OPT End Date <span className="text-muted-foreground font-normal">(12 months)</span></label>
+            <input
+              type="date"
+              value={form.optEndDate}
+              onChange={(e) => setForm((f) => ({ ...f, optEndDate: e.target.value }))}
+              required
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
+
+          {stemEndDate && (
+            <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm">
+              <span className="text-muted-foreground">STEM OPT end date (if extended): </span>
+              <span className="font-medium">{new Date(stemEndDate).toLocaleDateString()}</span>
+              <span className="text-muted-foreground text-xs block mt-0.5">24 months from OPT end</span>
             </div>
-          ))}
+          )}
+
+          <div>
+            <label className="mb-1 block text-sm font-medium">Employer Name <span className="text-muted-foreground font-normal">(optional)</span></label>
+            <input
+              type="text"
+              value={form.employerName}
+              onChange={(e) => setForm((f) => ({ ...f, employerName: e.target.value }))}
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
+
           <button
             type="submit"
             disabled={loading}
