@@ -127,6 +127,37 @@ export function TrackerClient({ opt, timeline, initialJobs }: Props) {
   const totalAllowed = timeline.unemploymentDaysUsed + timeline.unemploymentDaysRemaining;
   const isOver = timeline.unemploymentDaysUsed > totalAllowed;
 
+  // Calculate visible unemployment gaps from job history
+  function calcGaps() {
+    if (!opt.optStartDate || jobs.length === 0) return [];
+    const now = new Date();
+    const windowStart = new Date(opt.optStartDate);
+    const windowEnd = opt.stemEndDate ? new Date(opt.stemEndDate) : opt.optEndDate ? new Date(opt.optEndDate) : now;
+    const sorted = [...jobs].sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+    const gaps: { start: Date; end: Date; days: number }[] = [];
+    let cursor = windowStart;
+
+    for (const job of sorted) {
+      const jobStart = new Date(job.startDate) < windowStart ? windowStart : new Date(job.startDate);
+      const jobEnd = job.endDate ? new Date(job.endDate) : now;
+      if (jobStart > cursor) {
+        const gapEnd = jobStart < windowEnd ? jobStart : windowEnd;
+        const days = differenceInDays(gapEnd, cursor);
+        if (days > 0) gaps.push({ start: cursor, end: gapEnd, days });
+      }
+      if (jobEnd > cursor) cursor = jobEnd;
+    }
+    // trailing gap
+    const effectiveEnd = windowEnd < now ? windowEnd : now;
+    if (cursor < effectiveEnd) {
+      const days = differenceInDays(effectiveEnd, cursor);
+      if (days > 0) gaps.push({ start: cursor, end: effectiveEnd, days });
+    }
+    return gaps;
+  }
+
+  const gaps = calcGaps();
+
   return (
     <div className="space-y-8 animate-fade-in max-w-3xl">
       <div className="flex items-center justify-between">
@@ -318,6 +349,21 @@ export function TrackerClient({ opt, timeline, initialJobs }: Props) {
                   </div>
                 </div>
               )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Unemployment Gaps */}
+      {gaps.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="font-medium text-sm">Unemployment Gaps</h3>
+          {gaps.map((gap, i) => (
+            <div key={i} className="flex items-center justify-between rounded-lg border border-yellow-500/20 bg-yellow-500/5 px-4 py-3 text-sm">
+              <span className="text-yellow-400">
+                {format(gap.start, "MMM d, yyyy")} → {format(gap.end, "MMM d, yyyy")}
+              </span>
+              <span className="font-medium text-yellow-400">{gap.days} days</span>
             </div>
           ))}
         </div>
