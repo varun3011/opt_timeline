@@ -73,9 +73,23 @@ model OPTApplication {
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
-  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  stemExtension StemExtension?
-  unemployment  UnemploymentLog[]
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stemExtension     StemExtension?
+  unemployment      UnemploymentLog[]
+  employmentHistory EmploymentHistory[]
+}
+
+model EmploymentHistory {
+  id               String    @id @default(cuid())
+  optApplicationId String
+  employerName     String
+  startDate        DateTime
+  endDate          DateTime?
+  isCurrent        Boolean   @default(false)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  optApplication OPTApplication @relation(fields: [optApplicationId], references: [id], onDelete: Cascade)
 }
 
 enum OPTStatus {
