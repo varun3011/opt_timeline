@@ -1,7 +1,7 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
-import { computeTimeline } from "@/lib/opt-engine";
+import { computeTimeline, calcUnemploymentDays } from "@/lib/opt-engine";
 import { differenceInDays } from "date-fns";
 
 export default async function AnalyticsPage() {
@@ -15,9 +15,7 @@ export default async function AnalyticsPage() {
   if (!opt) redirect("/onboarding");
 
   const tl = computeTimeline(opt);
-  const totalUnemployment = opt.unemployment.reduce(
-    (s: number, l: { startDate: Date; endDate: Date | null }) => s + differenceInDays(l.endDate ?? new Date(), l.startDate), 0
-  );
+  const totalUnemployment = calcUnemploymentDays(opt.unemployment);
 
   const stats = [
     { label: "Total OPT Period", value: `${tl.totalDays} days` },
@@ -53,7 +51,7 @@ export default async function AnalyticsPage() {
         ) : (
           <div className="space-y-2">
             {opt.unemployment.map((log) => {
-              const days = differenceInDays(log.endDate ?? new Date(), log.startDate);
+              const days = differenceInDays(log.endDate ?? new Date(), log.startDate) + 1;
               return (
                 <div key={log.id} className="flex justify-between text-sm">
                   <span className="text-muted-foreground">

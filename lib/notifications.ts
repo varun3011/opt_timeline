@@ -8,33 +8,41 @@ function getResend() {
   return resend;
 }
 
+const BATCH_SIZE = 100;
+
 export async function sendDeadlineNotifications() {
-  const users = await prisma.user.findMany({
-    include: {
-      optApplication: { include: { stemExtension: true, unemployment: true } },
-    },
-  });
+  let cursor: string | undefined;
 
-  for (const user of users) {
-    if (!user.email || !user.optApplication) continue;
-    const tl = computeTimeline(user.optApplication);
+  while (true) {
+    const users = await prisma.user.findMany({
+      take: BATCH_SIZE,
+      ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+      include: {
+        optApplication: { include: { stemExtension: true, unemployment: true } },
+      },
+    });
 
-    for (const alert of tl.alerts) {
-      const existing = await prisma.notification.findFirst({
-        where: { userId: user.id, message: alert, createdAt: { gte: new Date(Date.now() - 86400000) } },
-      });
-      if (existing) continue;
+    if (users.length === 0) break;
 
-      await prisma.notification.create({
-        data: {
-          userId: user.id,
-          type: "DEADLINE_REMINDER",
-          title: "OPT Deadline Alert",
-          message: alert,
-        },
-      });
+    for (const user of users) {
+      if (!user.email || !user.optApplication) continue;
+      const tl = computeTimeline(user.optApplication);
 
-      if (tl.daysRemaining <= 60) {
+      for (const alert of tl.alerts) {
+        const existing = await prisma.notification.findFirst({
+          where: { userId: user.id, message: alert, createdAt: { gte: new Date(Date.now() - 86400000) } },
+        });
+        if (existing) continue;
+
+        await prisma.notification.create({
+          data: {
+            userId: user.id,
+            type: "DEADLINE_REMINDER",
+            title: "OPT Deadline Alert",
+            message: alert,
+          },
+        });
+
         await getResend().emails.send({
           from: process.env.RESEND_FROM_EMAIL!,
           to: user.email,
@@ -43,5 +51,8 @@ export async function sendDeadlineNotifications() {
         });
       }
     }
+
+    cursor = users[users.length - 1].id;
+    if (users.length < BATCH_SIZE) break;
   }
 }
