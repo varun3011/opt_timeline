@@ -2,7 +2,11 @@ import { auth } from "@/auth";
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+let _openai: OpenAI;
+function getOpenAI() {
+  if (!_openai) _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  return _openai;
+}
 
 const SYSTEM_PROMPT = `You are an expert F-1 immigration assistant specializing in OPT and STEM OPT.
 You help international students understand their work authorization, deadlines, and compliance requirements.
@@ -15,7 +19,7 @@ export async function POST(req: Request) {
   const { messages } = await req.json();
   const capped = Array.isArray(messages) ? messages.slice(-20) : [];
 
-  const completion = await openai.chat.completions.create({
+  const completion = await getOpenAI().chat.completions.create({
     model: "gpt-4o-mini",
     messages: [{ role: "system", content: SYSTEM_PROMPT }, ...capped],
     max_tokens: 500,
