@@ -49,31 +49,31 @@ export function calcUnemploymentFromJobs(
   windowStart: Date,
   windowEnd: Date
 ): number {
-  if (!jobs.length) return 0;
   const now = new Date();
-  const sorted = [...jobs].sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
+  const effectiveEnd = min([windowEnd, now]);
+  if (effectiveEnd <= windowStart) return 0;
 
-  let unemployed = 0;
+  // Build covered intervals from jobs within window
+  const sorted = [...jobs]
+    .sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
+
+  let employed = 0;
   let cursor = windowStart;
 
   for (const job of sorted) {
     const jobStart = max([job.startDate, windowStart]);
-    const jobEnd = min([job.endDate ?? now, windowEnd]);
-
-    if (jobStart > cursor) {
-      // gap before this job
-      unemployed += Math.max(0, differenceInDays(jobStart, cursor));
+    const jobEnd = min([job.endDate ?? now, effectiveEnd]);
+    if (jobStart >= effectiveEnd) break;
+    if (jobEnd <= cursor) continue;
+    const start = max([jobStart, cursor]);
+    if (start < jobEnd) {
+      employed += differenceInDays(jobEnd, start);
+      cursor = jobEnd;
     }
-    if (jobEnd > cursor) cursor = jobEnd;
-    if (cursor >= windowEnd) break;
   }
 
-  // gap after last job
-  if (cursor < windowEnd) {
-    unemployed += Math.max(0, differenceInDays(min([windowEnd, now]), cursor));
-  }
-
-  return unemployed;
+  const totalWindow = differenceInDays(effectiveEnd, windowStart);
+  return Math.max(0, totalWindow - employed);
 }
 
 export function computeTimeline(
@@ -106,7 +106,11 @@ export function computeTimeline(
   if (opt.optStartDate && opt.optEndDate) {
     const phase1Used = jobs.length > 0
       ? calcUnemploymentFromJobs(jobs, opt.optStartDate, opt.optEndDate)
-      : calcUnemploymentDays(opt.unemployment);
+      : calcUnemploymentDays(
+          opt.unemployment.filter(
+            (l) => l.startDate >= opt.optStartDate! && (l.endDate ?? new Date()) <= opt.optEndDate!
+          )
+        );
     phases.push({
       phase: 1,
       label: "Phase 1: Post-Completion OPT",
@@ -120,9 +124,18 @@ export function computeTimeline(
   }
 
   if (opt.stemExtension?.stemStartDate && opt.stemExtension?.stemEndDate) {
+    // STEM limit is 150 CUMULATIVE across both phases
     const phase2Used = jobs.length > 0
       ? calcUnemploymentFromJobs(jobs, opt.stemExtension.stemStartDate, opt.stemExtension.stemEndDate)
-      : 0;
+      : calcUnemploymentDays(
+          opt.unemployment.filter(
+            (l) =>
+              l.startDate >= opt.stemExtension!.stemStartDate! &&
+              (l.endDate ?? new Date()) <= opt.stemExtension!.stemEndDate!
+          )
+        );
+    const phase1Used = phases[0]?.used ?? 0;
+    const totalUsed = phase1Used + phase2Used;
     phases.push({
       phase: 2,
       label: "Phase 2: STEM OPT Extension",
@@ -130,8 +143,8 @@ export function computeTimeline(
       end: opt.stemExtension.stemEndDate,
       limit: STEM_UNEMPLOYMENT_LIMIT,
       used: phase2Used,
-      remaining: Math.max(0, STEM_UNEMPLOYMENT_LIMIT - phase2Used),
-      percentUsed: Math.min(100, Math.round((phase2Used / STEM_UNEMPLOYMENT_LIMIT) * 100)),
+      remaining: Math.max(0, STEM_UNEMPLOYMENT_LIMIT - totalUsed),
+      percentUsed: Math.min(100, Math.round((totalUsed / STEM_UNEMPLOYMENT_LIMIT) * 100)),
     });
   }
 
