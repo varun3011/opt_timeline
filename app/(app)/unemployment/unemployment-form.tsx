@@ -43,3 +43,26 @@ export function UnemploymentForm({ optId }: { optId: string }) {
     </form>
   );
 }
+
+export function DeleteUnemploymentButton({ id }: { id: string }) {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+
+  async function handleDelete() {
+    if (!confirm("Delete this entry?")) return;
+    setLoading(true);
+    await fetch("/api/unemployment", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+    router.refresh();
+    setLoading(false);
+  }
+
+  return (
+    <button onClick={handleDelete} disabled={loading} className="text-xs text-red-400 hover:text-red-300 disabled:opacity-50">
+      {loading ? "…" : "Delete"}
+    </button>
+  );
+}

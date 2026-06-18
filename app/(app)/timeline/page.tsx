@@ -43,7 +43,7 @@ export default async function TimelinePage() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <p className="text-sm text-muted-foreground">Status</p>
-            <p className="font-semibold capitalize">{tl.status.replace("_", " ")}</p>
+            <p className="font-semibold capitalize">{tl.status.replaceAll("_", " ")}</p>
           </div>
           <div className="text-right">
             <p className="text-sm text-muted-foreground">Days Remaining</p>
@@ -60,15 +60,23 @@ export default async function TimelinePage() {
       </div>
 
       <div className="space-y-1">
-        {milestones.map((m, i) => (
-          <div key={i} className="flex items-center gap-4 rounded-lg px-4 py-3 hover:bg-accent/50 transition-colors">
-            <div className={`h-3 w-3 rounded-full flex-shrink-0 ${m.done ? "bg-green-400" : "bg-muted"}`} />
-            <span className="flex-1 text-sm">{m.label}</span>
-            <span className="text-sm text-muted-foreground">
-              {m.date ? format(new Date(m.date), "MMM d, yyyy") : m.done ? "✓" : "—"}
-            </span>
-          </div>
-        ))}
+        {milestones.map((m, i) => {
+          const isUpcoming = !m.done && !!m.date && new Date(m.date) > new Date();
+          const dotColor = m.done
+            ? "bg-green-400"
+            : isUpcoming
+            ? "bg-primary"
+            : "bg-muted";
+          return (
+            <div key={i} className="flex items-center gap-4 rounded-lg px-4 py-3 hover:bg-accent/50 transition-colors">
+              <div className={`h-3 w-3 rounded-full flex-shrink-0 ${dotColor}`} />
+              <span className="flex-1 text-sm">{m.label}</span>
+              <span className="text-sm text-muted-foreground">
+                {m.date ? format(new Date(m.date), "MMM d, yyyy") : m.done ? "✓" : "—"}
+              </span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

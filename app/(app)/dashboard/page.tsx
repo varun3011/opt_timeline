@@ -11,7 +11,19 @@ export default async function DashboardPage() {
 
   const opt = await prisma.oPTApplication.findUnique({
     where: { userId: session.user.id },
-    include: { stemExtension: true, unemployment: true },
+    include: {
+      stemExtension: true,
+      unemployment: true,
+      user: {
+        select: {
+          notifications: {
+            where: { read: false },
+            orderBy: { createdAt: "desc" },
+            take: 5,
+          },
+        },
+      },
+    },
   });
 
   if (!opt) redirect("/onboarding");
@@ -27,11 +39,7 @@ export default async function DashboardPage() {
     expired: "text-red-500",
   };
 
-  const notifications = await prisma.notification.findMany({
-    where: { userId: session.user.id, read: false },
-    orderBy: { createdAt: "desc" },
-    take: 5,
-  });
+  const notifications = opt.user.notifications;
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -42,7 +50,7 @@ export default async function DashboardPage() {
 
       {/* Status Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="OPT Status" value={opt.status.replace("_", " ")} color={statusColors[timeline.status]} />
+        <StatCard label="OPT Status" value={opt.status.replaceAll("_", " ")} color={statusColors[timeline.status]} />
         <StatCard label="Days Remaining" value={String(timeline.daysRemaining)} sublabel="until expiry" />
         <StatCard label="Unemployment Days" value={`${timeline.unemploymentDaysUsed} / ${timeline.unemploymentDaysUsed + timeline.unemploymentDaysRemaining}`} sublabel="days used" />
         <StatCard label="Progress" value={`${Math.round(timeline.progressPercent)}%`} sublabel="of OPT period" />

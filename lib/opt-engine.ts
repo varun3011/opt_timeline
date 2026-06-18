@@ -24,10 +24,10 @@ export interface TimelineData {
 const OPT_UNEMPLOYMENT_LIMIT = 90;
 const STEM_UNEMPLOYMENT_LIMIT = 150;
 
-function calcUnemploymentDays(logs: UnemploymentLog[]): number {
+export function calcUnemploymentDays(logs: UnemploymentLog[]): number {
   return logs.reduce((sum, log) => {
     const end = log.endDate ?? new Date();
-    return sum + differenceInDays(end, log.startDate);
+    return sum + differenceInDays(end, log.startDate) + 1;
   }, 0);
 }
 

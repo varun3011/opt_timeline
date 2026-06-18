@@ -17,6 +17,7 @@ export default function OnboardingPage() {
     employerName: "",
   });
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   function handleStartDateChange(value: string) {
     setForm((f) => ({
@@ -29,12 +30,19 @@ export default function OnboardingPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    await fetch("/api/onboarding", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    });
-    router.push("/dashboard");
+    setError("");
+    try {
+      const res = await fetch("/api/onboarding", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      if (!res.ok) throw new Error("Failed to save");
+      router.push("/dashboard");
+    } catch {
+      setError("Something went wrong. Please try again.");
+      setLoading(false);
+    }
   }
 
   // STEM OPT = 24 months from OPT end date
@@ -68,6 +76,7 @@ export default function OnboardingPage() {
               required
               className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
+            <p className="text-xs text-yellow-500 mt-1">This is an estimate. Use the exact date from your EAD card.</p>
           </div>
 
           {stemEndDate && (
@@ -88,6 +97,7 @@ export default function OnboardingPage() {
             />
           </div>
 
+          {error && <p className="text-sm text-red-400">{error}</p>}
           <button
             type="submit"
             disabled={loading}
