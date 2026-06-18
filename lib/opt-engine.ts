@@ -1,4 +1,4 @@
-import { differenceInDays, isPast, isWithinInterval, max, min } from "date-fns";
+import { differenceInDays, max, min } from "date-fns";
 import type { OPTApplication, StemExtension, UnemploymentLog, EmploymentHistory } from "@prisma/client";
 
 export type TimelineStatus =
@@ -163,25 +163,44 @@ export function computeTimeline(
   }
 
   const stemEnd = opt.stemExtension?.stemEndDate;
-  const endDate = stemEnd ?? opt.optEndDate;
-  const startDate = opt.stemExtension?.stemStartDate ?? opt.optStartDate;
-  const totalDays = differenceInDays(endDate, startDate);
-  const daysRemaining = differenceInDays(endDate, now);
-  const progressPercent = Math.min(100, Math.max(0, ((totalDays - daysRemaining) / totalDays) * 100));
+  const stemStart = opt.stemExtension?.stemStartDate;
+  const optNotStarted = now < opt.optStartDate;
+  const optExpired = now > opt.optEndDate;
+  const inStem = !!stemStart && !!stemEnd && now >= stemStart && now <= stemEnd;
+  const stemExpired = !!stemEnd && now > stemEnd;
 
-  let status: TimelineStatus = "opt_active";
-  if (isPast(endDate)) status = "expired";
+  // Progress tracks only the current active phase
+  const phaseStart = inStem && stemStart ? stemStart : opt.optStartDate;
+  const phaseEnd = inStem && stemEnd ? stemEnd : opt.optEndDate;
+  const totalDays = differenceInDays(phaseEnd, phaseStart);
+  const elapsed = Math.max(0, differenceInDays(now, phaseStart));
+  const daysRemaining = Math.max(0, differenceInDays(phaseEnd, now));
+  const progressPercent = totalDays > 0
+    ? Math.min(100, Math.max(0, (elapsed / totalDays) * 100))
+    : 0;
+
+  let status: TimelineStatus;
+  if (stemExpired) status = "expired";
+  else if (optExpired && !inStem) status = stemEnd ? "stem_pending" : "expired";
+  else if (optNotStarted) status = "pre_opt";
+  else if (inStem) status = "stem_active";
   else if (daysRemaining <= 30) status = "critical";
   else if (daysRemaining <= 60) status = "warning";
-  else if (stemEnd && isWithinInterval(now, { start: startDate, end: stemEnd })) status = "stem_active";
+  else status = "opt_active";
 
-  if (!opt.stemExtension && daysRemaining <= 90) {
+  if (!opt.stemExtension && !optExpired && !optNotStarted && differenceInDays(opt.optEndDate, now) <= 90) {
     alerts.push("Time to apply for STEM OPT extension!");
   }
 
-  const nextDeadline = daysRemaining > 0
-    ? { label: stemEnd ? "STEM OPT Expires" : "OPT Expires", date: endDate }
-    : null;
+  // Next deadline: most relevant upcoming date
+  let nextDeadline: { label: string; date: Date } | null = null;
+  if (optNotStarted) {
+    nextDeadline = { label: "OPT Starts", date: opt.optStartDate };
+  } else if (!optExpired) {
+    nextDeadline = { label: "OPT Expires", date: opt.optEndDate };
+  } else if (stemEnd && !stemExpired) {
+    nextDeadline = { label: "STEM OPT Expires", date: stemEnd };
+  }
 
   return {
     status,
